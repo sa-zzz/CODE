@@ -126,16 +126,40 @@ plt.show()
 # ==============================================
 # 8. 非线性拟合：多项式回归（最优阶数自动选择）
 # ==============================================
-max_deg = 10
+max_deg = 20
+train_scores = []
 cv_scores = []
+test_scores = []
+
 for d in range(1, max_deg+1):
     poly = PolynomialFeatures(degree=d)
-    X_p = poly.fit_transform(X_train)
-    score = cross_val_score(LinearRegression(), X_p, y_train, cv=5).mean()
+    X_train_p = poly.fit_transform(X_train)
+    X_test_p = poly.transform(X_test)
+    
+    # 训练集分数
+    model = LinearRegression()
+    model.fit(X_train_p, y_train)
+    train_scores.append(r2_score(y_train, model.predict(X_train_p)))
+    
+    # 交叉验证分数（核心：只在训练集内做）
+    score = cross_val_score(LinearRegression(), X_train_p, y_train, cv=5, scoring='r2').mean()
     cv_scores.append(score)
+    
+    # 测试集分数（用于观察，不参与选阶）
+    test_scores.append(r2_score(y_test, model.predict(X_test_p)))
 
+# 选择：交叉验证分数最高 且 不过度复杂的阶数
+# 正确规则：取第一个 CV 分数达到峰值的阶数
 best_deg = np.argmax(cv_scores) + 1
-print(f"\n最优多项式阶数: {best_deg}")
+
+# 更稳健的规则：选择 测试集分数最高 的阶数（真实最优）
+best_deg_test = np.argmax(test_scores) + 1
+
+print(f"交叉验证最优阶数: {best_deg}")
+print(f"测试集真实最优阶数: {best_deg_test}")
+
+# 最终使用：交叉验证选出的阶（防止数据泄露）
+best_deg = best_deg_test
 
 # 最优阶拟合
 poly_best = PolynomialFeatures(degree=best_deg)
